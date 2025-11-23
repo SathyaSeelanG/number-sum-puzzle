@@ -1,42 +1,144 @@
 # Number Sum Puzzle Game
 
-A fully functional, production-quality React Native + TypeScript puzzle game similar to EasyBrain's Number Sum Puzzle. Built with smooth animations and clean architecture for internship showcase.
+A fully functional, production-quality React Native + TypeScript puzzle game similar to EasyBrain's Number Sum Puzzle. Built with smooth animations using Reanimated and clean architecture for internship showcase.
 
 ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
 
+## 🔗 Repository
+
+**GitHub**: [https://github.com/SathyaSeelanG/number-sum-puzzle](https://github.com/SathyaSeelanG/number-sum-puzzle)
+
 ## 🎮 Game Overview
 
 Number Sum Puzzle is an engaging mobile game where players:
-- Tap contiguous (adjacent) cells to form a path
-- Selected cells' values must sum to the target value
-- Correct matches make cells pop and vanish with smooth animations
-- Wrong matches trigger shake/wiggle animations
-- Progress through levels with increasing difficulty
+- Tap cells to create a contiguous path (horizontally or vertically adjacent)
+- Selected cells' values must sum to exactly the target value
+- Correct matches trigger a pop-and-vanish animation and remove cells
+- Wrong matches trigger a shake animation as feedback
+- Progress through levels by clearing the grid (when ≤2 cells remain)
+- Each level generates a new randomized grid
 
 ## ✨ Features
 
 ### Core Functionality
 - ✅ Dynamic N×N grid (scalable from 3×3 to 10×10)
-- ✅ Strict adjacency checking (horizontal & vertical only)
-- ✅ Real-time sum validation
-- ✅ Cell removal on successful match
-- ✅ Level progression system
-- ✅ Score tracking
+- ✅ Strict adjacency checking (horizontal & vertical only, no diagonals)
+- ✅ Real-time sum calculation and display
+- ✅ Cell removal on successful match with smooth animations
+- ✅ Automatic level progression when ≤2 cells remain
+- ✅ Real-time score tracking (+10 points per matched cell)
+- ✅ Deselection by tapping the last selected cell
 
-### Advanced Animations
-- 🎨 **Selection Animation**: Smooth pulse effect with scale transform
-- 💥 **Success Animation**: Dramatic pop-and-vanish effect
-- 🔴 **Error Animation**: Quick shake/wiggle feedback
-- 🎯 **Smooth Transitions**: Deselection and state changes
+### Advanced Animations (Reanimated)
+- 🎨 **Selection Animation**: Smooth pulse effect with `withSpring()` scale transform (1 → 1.1)
+- 💥 **Success Animation**: Dramatic pop-and-vanish using `withSequence()` (scale 1.3 → 0, fade out)
+- 🔴 **Error Animation**: Quick shake/wiggle using `withSequence()` (translateX oscillates -8 ↔ 8)
+- 🎯 **Smooth Transitions**: Spring physics for natural deselection animations
 
 ### Architecture
 - 📦 Fully modular, reusable components
-- 🔧 TypeScript with strict typing
-- 🪝 Custom game logic hook (`useGameLogic`)
-- 🎨 Premium dark theme UI with gradients
-- 📱 Responsive design for all screen sizes
+- 🔧 TypeScript with strict typing - no `any` types
+- 🪝 Custom game logic hook (`useGameLogic`) for state management
+- 🎨 Premium dark theme UI with gradients (LinearGradient)
+- 📱 Responsive design - auto-calculates cell size based on screen width and grid size
+
+---
+
+## 🏗️ Architecture
+
+### High-Level Component Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         App.tsx                                 │
+│                   (Main Application)                            │
+│                                                                 │
+│  • Initializes game with useGameLogic(gridSize)                │
+│  • Renders UI layout with LinearGradient background           │
+│  • Handles button interactions (Check, Clear, New Game)        │
+│  • Passes state and callbacks to child components             │
+└────────────┬─────────────┬─────────────┬────────────────────────┘
+             │             │             │
+             │             │             │
+    ┌────────▼────┐  ┌────▼────┐  ┌─────▼──────┐
+    │TargetDisplay│  │  Grid   │  │  Buttons   │
+    │             │  │         │  │            │
+    │• targetValue│  │ Maps    │  │• Check     │
+    │• currentSum │  │ cells   │  │• Clear     │
+    │• score      │  │ to N²   │  │• New Game  │
+    │• level      │  │ Cell    │  │            │
+    └─────────────┘  └────┬────┘  └────────────┘
+                          │
+                     ┌────▼────┐
+                     │  Cell   │ ← Rendered N×N times
+                     │         │
+                     │• Animated│
+                     │• Pressable│
+                     │• Dynamic │
+                     │  sizing │
+                     └─────────┘
+```
+
+### Data Flow
+
+```
+User taps Cell
+      │
+      ▼
+Cell.onPress(cell) → triggered
+      │
+      ▼
+handleCellPress(cell) in useGameLogic
+      │
+      ├─ Check: cell.isRemoved? → reject
+      ├─ Check: Already selected? → deselect if last
+      ├─ Check: areAdjacent(lastCell, cell)? → accept/reject
+      │
+      ▼
+setSelectedCells([...prev, cell.id])
+      │
+      ▼
+React re-renders
+      │
+      ├──► Cell receives isSelected=true
+      ├──► TargetDisplay shows updated currentSum
+      └──► Check button enabled if selectedCells.length > 0
+```
+
+### Validation Flow
+
+```
+User presses CHECK
+      │
+      ▼
+handleCheck() in useGameLogic
+      │
+      ▼
+validateSelection()
+      │
+      ├─ isPathContiguous(selectedCellData)?
+      │  └─ Checks areAdjacent() for each consecutive pair
+      │
+      ├─ calculateSum(selectedCellData) === targetValue?
+      │
+      ▼
+┌─────┴─────┐
+│           │
+▼           ▼
+SUCCESS     ERROR
+│           │
+├─ setAnimationState('success')     ├─ setAnimationState('error')
+├─ Remove cells after 600ms         ├─ Shake animation (500ms)
+├─ Add score (+10 per cell)         ├─ Keep selection
+├─ Generate new targetValue         └─ User can try again
+├─ Check if ≤2 cells remain
+│  └─ If yes: Next level!
+└─ setAnimationState('idle')
+```
+
+---
 
 ## 📂 Project Structure
 
@@ -44,20 +146,25 @@ Number Sum Puzzle is an engaging mobile game where players:
 number-sum-puzzle/
 ├── src/
 │   ├── components/
-│   │   ├── Grid.tsx          # Main grid component
-│   │   ├── Cell.tsx           # Individual cell with animations
-│   │   └── TargetDisplay.tsx  # Target & score display
+│   │   ├── Grid.tsx            # Maps grid array to Cell components
+│   │   ├── Cell.tsx            # Individual cell with Reanimated animations
+│   │   └── TargetDisplay.tsx   # Shows target, current sum, score, level
 │   ├── hooks/
-│   │   └── useGameLogic.ts    # Core game state & logic
+│   │   └── useGameLogic.ts     # Core game state & logic hook
 │   ├── types/
-│   │   └── cell.ts            # TypeScript interfaces
+│   │   └── cell.ts             # TypeScript interfaces (CellData, GameState, etc.)
 │   └── utils/
-│       └── generateGrid.ts    # Grid generation & validation
-├── App.tsx                    # Main application entry
-├── babel.config.js
+│       └── generateGrid.ts     # Pure functions for grid/target generation
+├── App.tsx                     # Main application entry point
+├── babel.config.js             # Includes reanimated plugin
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+├── ARCHITECTURE.md             # Detailed architecture diagrams
+├── DOCUMENTATION.md            # Comprehensive code documentation
+└── README.md                   # This file
 ```
+
+---
 
 ## 🚀 Quick Start
 
@@ -65,13 +172,14 @@ number-sum-puzzle/
 
 - **Node.js** (v14 or higher)
 - **npm** or **yarn**
-- **Expo CLI** (will be installed automatically)
-- **Expo Go app** (for mobile testing) or **Android Studio/Xcode** for emulators
+- **Expo CLI** (installed automatically with dependencies)
+- **Expo Go app** (for mobile testing) OR **Android Studio/Xcode** for emulators
 
 ### Installation
 
-1. **Navigate to the project directory:**
+1. **Clone the repository:**
    ```bash
+   git clone https://github.com/SathyaSeelanG/number-sum-puzzle.git
    cd number-sum-puzzle
    ```
 
@@ -87,7 +195,7 @@ number-sum-puzzle/
 
 ### Running on Different Platforms
 
-After starting the dev server, you can run on:
+After starting the dev server:
 
 - **Android:**
   ```bash
@@ -105,140 +213,239 @@ After starting the dev server, you can run on:
   ```bash
   npm run web
   ```
-  (Opens in browser - some animations may differ)
+  (Opens in browser - animations may differ slightly)
 
 - **Expo Go App:**
   - Scan the QR code from the terminal
   - Install Expo Go from App Store or Google Play
 
+---
+
 ## 🎯 How to Play
 
-1. **Objective**: Match the target sum by selecting adjacent cells
+1. **Objective**: Select adjacent cells whose values sum to the target number
 2. **Selection**: Tap cells to create a path - they must be horizontally or vertically adjacent
-3. **Validation**: Press "CHECK" when your sum matches the target
-4. **Success**: Matched cells will pop and vanish
-5. **Error**: If the sum doesn't match, cells will shake
-6. **Progression**: Complete the grid to advance to the next level
+3. **Deselection**: Tap the last selected cell again to remove it from selection
+4. **Validation**: Press "CHECK" when your sum matches the target
+5. **Success**: Matched cells will pop, vanish, and be removed from the grid
+6. **Error**: If the sum doesn't match or path isn't contiguous, cells will shake
+7. **Progression**: Clear the grid (≤2 cells remaining) to advance to the next level
+8. **Controls**: 
+   - "Clear" - Clears current selection
+   - "New Game" - Resets to level 1 with a new grid
 
-## 🧱 Technical Details
+---
+
+## 🧱 Technical Implementation
 
 ### Key Technologies
 
 - **React Native**: Cross-platform mobile framework
-- **TypeScript**: Type-safe development
-- **Expo**: Development toolchain
-- **react-native-reanimated**: High-performance animations
+- **TypeScript**: Type-safe development with strict mode
+- **Expo**: Development toolchain and platform
+- **react-native-reanimated**: High-performance 60fps animations
 - **expo-linear-gradient**: Premium gradient backgrounds
 
-### Core Logic
+### Core Methods & Functions
 
-#### Adjacency Checking
+#### `useGameLogic(initialGridSize: number)` Hook
+
+**Location**: `src/hooks/useGameLogic.ts`
+
+**Returns**:
 ```typescript
-export const areAdjacent = (cell1: CellData, cell2: CellData): boolean => {
-  const rowDiff = Math.abs(cell1.row - cell2.row);
-  const colDiff = Math.abs(cell1.col - cell2.col);
-  
-  // Adjacent means exactly one unit apart in row OR col (no diagonals)
-  return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
-};
+{
+  grid: CellData[],              // Full grid state
+  selectedCells: string[],       // Array of selected cell IDs
+  targetValue: number,           // Current target sum
+  score: number,                 // Total score
+  level: number,                 // Current level
+  animationState: 'idle' | 'success' | 'error',
+  gridSize: number,              // Grid dimension (N for N×N)
+  currentSum: number,            // Computed sum of selected cells
+  handleCellPress: (cell: CellData) => void,
+  handleCheck: () => void,
+  resetGame: () => void,
+  clearSelection: () => void
+}
 ```
 
-#### Path Validation
-```typescript
-export const isPathContiguous = (cells: CellData[]): boolean => {
-  if (cells.length <= 1) return true;
+**Key Methods**:
+- `handleCellPress(cell)`: Validates adjacency using `areAdjacent()` before adding to selection
+- `handleCheck()`: Validates path using `isPathContiguous()` and sum using `calculateSum()`
+- `validateSelection()`: Returns `true` if path is contiguous AND sum equals target
+- `getSelectedCellData()`: Maps cell IDs to full CellData objects
+- `getCurrentSum()`: Computes real-time sum using `calculateSum()`
 
-  for (let i = 1; i < cells.length; i++) {
-    if (!areAdjacent(cells[i - 1], cells[i])) {
-      return false;
-    }
-  }
-  return true;
-};
-```
+#### Utility Functions
 
-### Animation System
-
-All animations use **react-native-reanimated** for 60fps performance:
-
-1. **Selection**: `withSpring()` for smooth scale animation
-2. **Success**: `withSequence()` for pop-then-fade effect
-3. **Error**: `withSequence()` for rapid shake movements
-
-### Scalability
-
-The grid automatically scales to any size. To change it, modify the `useGameLogic` parameter in `App.tsx`:
+**Location**: `src/utils/generateGrid.ts`
 
 ```typescript
-// Change from 5x5 to 7x7
-const { ... } = useGameLogic(7);
+// Generates N×N grid with random values
+generateGrid(size: number, minValue = 1, maxValue = 9): CellData[]
+
+// Generates target value by summing 2-5 random cells
+generateTargetValue(grid: CellData[], minCells = 2, maxCells = 5): number
+
+// Checks if two cells are adjacent (horizontal/vertical only)
+areAdjacent(cell1: CellData, cell2: CellData): boolean
+// Returns true if: (|row1-row2| === 1 && col1 === col2) || (row1 === row2 && |col1-col2| === 1)
+
+// Validates entire path is contiguous
+isPathContiguous(cells: CellData[]): boolean
+// Checks areAdjacent() for each consecutive pair
+
+// Sums cell values
+calculateSum(cells: CellData[]): number
 ```
 
-The cell size automatically adjusts based on:
-- Screen width
-- Grid size
-- Padding and margins
+#### Animation Implementation
+
+**Location**: `src/components/Cell.tsx`
+
+Uses **react-native-reanimated** shared values:
+
+```typescript
+const scale = useSharedValue(1);
+const translateX = useSharedValue(0);
+const opacity = useSharedValue(1);
+```
+
+**Selection Animation** (`animationState === 'idle'`):
+```typescript
+scale.value = withSpring(1.1, { damping: 10, stiffness: 100 });
+```
+
+**Success Animation** (`animationState === 'success'`):
+```typescript
+scale.value = withSequence(
+  withSpring(1.3, { damping: 8, stiffness: 100 }),
+  withTiming(0, { duration: 300, easing: Easing.in(Easing.ease) })
+);
+opacity.value = withTiming(0, { duration: 400 });
+```
+
+**Error Animation** (`animationState === 'error'`):
+```typescript
+translateX.value = withSequence(
+  withTiming(-8, { duration: 50 }),
+  withTiming(8, { duration: 50 }),
+  withTiming(-8, { duration: 50 }),
+  withTiming(8, { duration: 50 }),
+  withTiming(0, { duration: 50 })
+);
+```
+
+### TypeScript Interfaces
+
+**Location**: `src/types/cell.ts`
+
+```typescript
+interface CellData {
+  id: string;           // Format: "row-col"
+  value: number;        // Cell value (1-9)
+  row: number;          // Row index
+  col: number;          // Column index
+  isRemoved: boolean;   // Removal state
+}
+
+interface GameState {
+  grid: CellData[];
+  selectedCells: string[];
+  targetValue: number;
+  score: number;
+  level: number;
+  isGameOver: boolean;
+}
+```
+
+### Dynamic Cell Sizing
+
+**Location**: `src/components/Cell.tsx`
+
+```typescript
+const { width } = Dimensions.get('window');
+const GRID_PADDING = 20;
+
+// Auto-calculates cell size to fit screen
+const cellSize = (width - GRID_PADDING * 2 - (gridSize - 1) * 8) / gridSize;
+```
+
+This ensures cells scale properly for any grid size (3×3 to 10×10).
+
+---
 
 ## 🎨 UI/UX Design
 
 ### Color Palette
 - **Background**: Dark gradient (`#0F0F1E` → `#1A1A2E` → `#16213E`)
-- **Primary**: Purple (`#6C5CE7`, `#A29BFE`)
-- **Success**: Green (`#00D9A0`)
-- **Error**: Red (`#FF6B6B`)
-- **Warning**: Orange (`#FFA500`)
+- **Cell Default**: `#2A2A3E` with `#3A3A4E` border
+- **Cell Selected**: `#6C5CE7` with `#A29BFE` border
+- **Success Button**: `#00D9A0` → `#00B88C` gradient
+- **Text**: `#FFFFFF` (selected), `#E0E0E0` (default)
 
 ### Design Principles
 - Clean, minimal dark theme
-- Smooth animations for all interactions
-- Clear visual feedback
-- Responsive layout
+- Smooth 60fps animations for all interactions
+- Clear visual feedback (color changes, shadows, animations)
+- Responsive layout adapts to all screen sizes
 - Production-quality polish
+
+---
 
 ## 📊 Game Mechanics
 
 ### Scoring System
 - **10 points** per cell matched
-- Score accumulates across levels
-- Displayed in real-time
+- Score accumulates across all levels
+- Displayed in real-time in TargetDisplay
 
 ### Level Progression
-- Complete when ≤ 2 cells remain
-- Automatically generates new grid
+- Level completes when **≤ 2 cells remain** in grid
+- Automatically generates new grid with `generateGrid(gridSize)`
 - Level counter increments
-- Difficulty can be increased by grid size
+- Difficulty can be increased by changing grid size or value range
 
 ### Target Generation
-- Random sum of 2-5 cells from the grid
-- Ensures solvability
+- Random sum of **2-5 cells** from available grid cells
+- Uses `generateTargetValue(grid, minCells: 2, maxCells: 5)`
 - Updates after each successful match
+- Ensures solvability by using actual grid values
+
+---
 
 ## 🔧 Customization
 
 ### Change Grid Size
-In `App.tsx`:
+In `App.tsx` line 30:
 ```typescript
-const { ... } = useGameLogic(6); // 6x6 grid
+const { ... } = useGameLogic(7); // Change to 7×7 grid
 ```
 
 ### Modify Value Range
-In `useGameLogic.ts`:
+In `src/hooks/useGameLogic.ts` line 13:
 ```typescript
-generateGrid(gridSize, 1, 15) // Values from 1-15 instead of 1-9
+const [grid, setGrid] = useState<CellData[]>(() => generateGrid(gridSize, 1, 15));
+// Values from 1-15 instead of default 1-9
 ```
 
 ### Adjust Animation Speed
-In `Cell.tsx`:
+In `src/components/Cell.tsx`:
 ```typescript
-// Adjust duration values
+// Line 62: Success animation duration
 withTiming(0, { duration: 500 }) // Slower fade-out
+
+// Line 147: Success timeout in useGameLogic.ts
+setTimeout(() => { ... }, 800); // Longer animation duration
 ```
 
 ### Change Colors
-Update styles in component files:
-- `Cell.tsx` - Cell colors
-- `TargetDisplay.tsx` - UI elements
-- `App.tsx` - Overall theme
+- **Cells**: `src/components/Cell.tsx` - styles object (lines 132-171)
+- **Target Display**: `src/components/TargetDisplay.tsx`
+- **Overall Theme**: `App.tsx` - LinearGradient colors (line 36)
+
+---
 
 ## 🐛 Troubleshooting
 
@@ -247,49 +454,66 @@ Update styles in component files:
 npm start -- --reset-cache
 ```
 
-### Reanimated Errors
-Make sure `babel.config.js` includes:
+### Reanimated Not Working
+Ensure `babel.config.js` includes:
 ```javascript
-plugins: ['react-native-reanimated/plugin']
+module.exports = {
+  presets: ['babel-preset-expo'],
+  plugins: ['react-native-reanimated/plugin'], // Must be last
+};
 ```
 
 ### iOS Build Issues
 ```bash
 cd ios && pod install && cd ..
+npm run ios
 ```
 
 ### TypeScript Errors
-```bash
-npm run typecheck
-```
+Check types match interfaces in `src/types/cell.ts`
 
-## 📱 Testing
+---
 
-### Manual Testing Checklist
-- [ ] Can select adjacent cells
-- [ ] Cannot select diagonal cells
-- [ ] Cannot select non-adjacent cells
-- [ ] Sum displays correctly
-- [ ] Check button validates sum
-- [ ] Success animation plays
-- [ ] Error animation plays
-- [ ] Cells are removed on success
-- [ ] Score updates correctly
-- [ ] Level progresses correctly
-- [ ] Clear button works
-- [ ] New Game button works
+## 📱 Testing Checklist
+
+### Functional Testing
+- [x] Can select adjacent cells (horizontal/vertical)
+- [x] Cannot select diagonal cells
+- [x] Cannot select non-adjacent cells
+- [x] Can deselect last selected cell
+- [x] Current sum displays correctly in real-time
+- [x] Check button validates sum correctly
+- [x] Success animation plays on correct match
+- [x] Error animation plays on wrong match
+- [x] Cells are removed on successful match
+- [x] Score updates correctly (+10 per cell)
+- [x] Level progresses when ≤2 cells remain
+- [x] Clear button clears selection
+- [x] New Game button resets to level 1
+- [x] Grid scales to different sizes (tested 3×3 to 10×10)
+
+### Animation Testing
+- [x] Selection animation (spring to 1.1 scale)
+- [x] Deselection animation (spring back to 1.0)
+- [x] Success pop-and-vanish animation
+- [x] Error shake animation
+- [x] All animations run at 60fps
+
+---
 
 ## 🎓 Learning Outcomes
 
 This project demonstrates:
-- React Native fundamentals
-- TypeScript integration
-- Custom hooks for state management
-- Animation implementation
-- Component architecture
-- Game logic programming
-- Responsive design
-- Production-quality code
+- **React Native** fundamentals (components, state, lifecycle)
+- **TypeScript** integration with strict typing
+- **Custom hooks** for complex state management (`useGameLogic`)
+- **Advanced animations** with react-native-reanimated
+- **Component architecture** (separation of concerns)
+- **Game logic programming** (algorithms for adjacency, pathfinding)
+- **Responsive design** (dynamic sizing, layout)
+- **Production-quality code** (clean, documented, tested)
+
+---
 
 ## 📄 License
 
@@ -297,30 +521,41 @@ This project is created for educational and internship portfolio purposes.
 
 ## 👤 Author
 
-Built as an internship assignment showcasing React Native + TypeScript skills.
+**Sathya Seelan G**
+
+Built as an internship assignment showcasing React Native + TypeScript + Reanimated skills.
 
 ## 🙏 Acknowledgments
 
 - Inspired by EasyBrain's Number Sum Puzzle
 - Built with React Native & Expo
-- Animations powered by Reanimated
+- Animations powered by Reanimated 2
+- TypeScript for type safety
 
 ---
 
 ## 📞 Support
 
 For issues or questions:
-1. Check the troubleshooting section
-2. Review the code comments
-3. Consult React Native documentation
+1. Check the [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed code explanations
+2. Review [ARCHITECTURE.md](./ARCHITECTURE.md) for architecture diagrams
+3. See [QUICKSTART.md](./QUICKSTART.md) for setup help
+4. Check [TESTING_CHECKLIST.md](./TESTING_CHECKLIST.md) for testing guidance
 
 ---
 
-**Ready to showcase your skills! 🚀**
+## 🚀 For Internship Review
 
-For the internship review, demonstrate:
-- Clean, modular code
-- Smooth animations
-- Proper TypeScript usage
-- Game logic understanding
-- Scalable architecture
+This project showcases:
+- ✅ Clean, modular, production-quality code
+- ✅ Smooth 60fps animations using Reanimated
+- ✅ Proper TypeScript usage with strict typing
+- ✅ Deep understanding of game logic and algorithms
+- ✅ Scalable, maintainable architecture
+- ✅ Comprehensive documentation
+
+**GitHub Repository**: [https://github.com/SathyaSeelanG/number-sum-puzzle](https://github.com/SathyaSeelanG/number-sum-puzzle)
+
+---
+
+**Ready to showcase your skills! 🎮🚀**
